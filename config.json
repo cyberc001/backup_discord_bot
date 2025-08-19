@@ -1,0 +1,8 @@
+{
+	"logging": {
+		"level": "trace"
+	},
+	"discord": {
+		"token": ""
+	}
+}
