@@ -4,6 +4,7 @@
 
 #include "discord.h"
 
+#include "utils.h"
 #include "msg_scraper.h"
 
 void on_ready(struct discord* client, const struct discord_ready* e)

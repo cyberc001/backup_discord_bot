@@ -1,5 +1,6 @@
 # executable
 backup_discord_bot
+backup/**
 
 # Prerequisites
 *.d
