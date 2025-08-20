@@ -1,5 +1,6 @@
 #include "msg_scraper.h"
 #include <string.h>
+#include "utils.h"
 
 void msg_scraper_on_ready(struct discord *client, const struct discord_ready *e)
 {
@@ -11,15 +12,22 @@ void msg_scraper_on_ready(struct discord *client, const struct discord_ready *e)
 		discord_create_guild_application_command(client, e->application->id, e->guilds->array[i].id, &params, NULL);
 }
 
+void _backup_got_messages(const struct discord_messages* msgs)
+{
+	for(int i = 0; i < msgs->size; ++i){
+		printf("%s\n", msgs->array[i].content);
+	}
+}
 void msg_scraper_on_interaction(struct discord *client, const struct discord_interaction *e)
 {
 	if(!strcmp(e->data->name, "backup")){
-		struct discord_interaction_response params = {
-			.type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
-			.data = &(struct discord_interaction_callback_data){
-				.content = "Starting backup..."
-			}
-		};
-		discord_create_interaction_response(client, e->id, e->token, &params, NULL);
+		struct discord_channels channels = get_guild_channels(client, e->guild_id);
+		for(int i = 0; i < channels.size; ++i){
+			struct discord_channel* chan = channels.array + i;
+			if(chan->type == DISCORD_CHANNEL_GUILD_TEXT && chan->id == 1396667972038430762)
+				get_all_channel_messages(client, chan->id, _backup_got_messages);
+		}
+
+		discord_channels_cleanup(&channels);
 	}
 }
