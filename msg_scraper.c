@@ -43,6 +43,19 @@ void _backup_got_messages(const struct discord_messages* msgs, void* _data)
 		free(data);
 	}
 }
+
+struct backup_dirent
+{
+	struct dirent* dent;
+	unsigned long id;
+};
+int backup_dirent_cmp(const void* _d1, const void* _d2)
+{
+	const struct backup_dirent *d1 = _d1, *d2 = _d2;
+	if(d1->id < d2->id) return -1;
+	return d1->id > d2->id;
+}
+
 void msg_scraper_on_interaction(struct discord *client, const struct discord_interaction *e)
 {
 	if(!strcmp(e->data->name, "backup")){
@@ -57,14 +70,16 @@ void msg_scraper_on_interaction(struct discord *client, const struct discord_int
 		strcat(guild_backup_path, "/"); // goes after make_dir() to have it iterate 1 less time
 
 		// scan directory for all subdirectories and sort them. Smallest ID = oldest backup
-		unsigned long min_id = ULONG_MAX, max_id = 0;
 		struct dirent* dent;
 		DIR* guild_backup_dir = opendir(guild_backup_path);
+		size_t backups_ln = 10, backups_i = 0;
+		struct backup_dirent* backups = malloc(sizeof(struct backup_dirent) * backups_ln);
 		while((dent = readdir(guild_backup_dir))){
-			struct stat st;
-			if(!strcmp(dent->d_name, ".") || !strcmp(dent->d_name, ".."))
+	                if((dent->d_name[0] == '.' && dent->d_name[1] == '\0') ||
+                                (dent->d_name[0] == '.' && dent->d_name[1] == '.' && dent->d_name[2] == '\0'))
 				continue;
 
+			struct stat st;
 			fstatat(dirfd(guild_backup_dir), dent->d_name, &st, 0);
 			if(S_ISDIR(st.st_mode)){
 				fprintf(stderr, "DIR %s\n", dent->d_name);
@@ -72,13 +87,33 @@ void msg_scraper_on_interaction(struct discord *client, const struct discord_int
 				unsigned long id = strtoul(dent->d_name, &endptr, 10);
 				if(*endptr) // invalid ID (not a number)
 					continue;
-				if(id < min_id)
-					min_id = id;
-				if(id > max_id)
-					max_id = id;
+				if(backups_i >= backups_ln){
+					backups_ln += 10;
+					backups = realloc(backups, sizeof(struct backup_dirent) * backups_ln);
+				}
+				backups[backups_i++] = (struct backup_dirent){
+					.dent = dent, .id = id
+				};
 			}
 		}
-		snprintf(backup_id_str, sizeof(backup_id_str), "%lu", ++max_id);
+		qsort(backups, backups_i, sizeof(struct backup_dirent), backup_dirent_cmp);
+		
+		// delete excessive backups
+		char dirname_buf[4096];
+		strcpy(dirname_buf, guild_backup_path);
+		size_t dirname_buf_end = strlen(dirname_buf);
+		const size_t MAX_BACKUPS = 3;
+		if(backups_i >= MAX_BACKUPS){
+			for(size_t i = 0; i < backups_i - MAX_BACKUPS + 1; ++i){
+				strcpy(dirname_buf + dirname_buf_end, backups[i].dent->d_name);
+				rm_dir(dirname_buf);
+			}
+		}
+		closedir(guild_backup_dir);
+
+		snprintf(backup_id_str, sizeof(backup_id_str), "%lu", backups_i ? backups[backups_i - 1].id + 1 : 1);
+		free(backups);
+
 		strcat(guild_backup_path, backup_id_str);
 		strcat(guild_backup_path, "/");
 		make_dir(guild_backup_path, 0755);

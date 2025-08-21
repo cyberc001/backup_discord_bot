@@ -4,6 +4,10 @@
 #include <stdarg.h>
 #include <errno.h>
 
+#include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
+
 void discord_interaction_respond(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
 {
 	va_list fargs;
@@ -103,5 +107,98 @@ int make_dir(const char* _path, mode_t mode)
 		return err;
 	}
 	free(path_alloc);
+	return 0;
+}
+
+// at any depth path_buf is only modified past path_buf_end, allowing to keep the same path in one buffer
+static int _rm_dir(char* path_buf, size_t path_buf_end)
+{
+	struct dirent* dent;
+	DIR* srcdir = opendir(path_buf);
+	if(!srcdir){
+		closedir(srcdir);
+		return ERROR_CANNOT_OPEN_DIR;
+	}
+
+	while((dent = readdir(srcdir))){
+		if((dent->d_name[0] == '.' && dent->d_name[1] == '\0') ||
+				(dent->d_name[0] == '.' && dent->d_name[1] == '.' && dent->d_name[2] == '\0'))
+			continue;
+
+		struct stat st;
+		if(fstatat(dirfd(srcdir), dent->d_name, &st, 0) < 0){
+			closedir(srcdir);
+			return ERROR_CANNOT_STAT_FILE;
+		}
+
+		if(S_ISDIR(st.st_mode)){
+			size_t path_buf_end_inc = strlen(dent->d_name);
+			memcpy(path_buf + path_buf_end, dent->d_name, path_buf_end_inc);
+			path_buf[path_buf_end + path_buf_end_inc++] = '/';
+			path_buf[path_buf_end + path_buf_end_inc] = '\0';
+			_rm_dir(path_buf, path_buf_end + path_buf_end_inc);
+
+			path_buf[path_buf_end + path_buf_end_inc] = '\0';
+			rmdir(path_buf);
+		} else if(S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)){
+			size_t path_buf_end_inc = strlen(dent->d_name);
+			memcpy(path_buf + path_buf_end, dent->d_name, path_buf_end_inc);
+			path_buf[path_buf_end + path_buf_end_inc] = '\0';
+			unlink(path_buf);
+		}
+	}
+	closedir(srcdir);
+	return 0;
+}
+int rm_dir(const char* path)
+{
+	struct dirent* dent;
+	DIR* srcdir = opendir(path);
+	if(!srcdir)
+		return ERROR_CANNOT_OPEN_DIR;
+
+	char path_buf[4096];
+	strcpy(path_buf, path);
+	size_t path_buf_end = strlen(path_buf);
+	char last_path_char = path[path_buf_end - 1];
+	if(last_path_char != '/' && last_path_char != '\\'){
+		path_buf[path_buf_end++] = '/';
+		path_buf[path_buf_end] = '\0';
+	}
+
+	while((dent = readdir(srcdir))){
+		if((dent->d_name[0] == '.' && dent->d_name[1] == '\0') ||
+				(dent->d_name[0] == '.' && dent->d_name[1] == '.' && dent->d_name[2] == '\0'))
+			continue;
+
+		struct stat st;
+		if(fstatat(dirfd(srcdir), dent->d_name, &st, 0) < 0){
+			closedir(srcdir);
+			return ERROR_CANNOT_STAT_FILE;
+		}
+
+		if(S_ISDIR(st.st_mode)){
+			size_t path_buf_end_inc = strlen(dent->d_name);
+			memcpy(path_buf + path_buf_end, dent->d_name, path_buf_end_inc);
+			path_buf[path_buf_end + path_buf_end_inc++] = '/';
+			path_buf[path_buf_end + path_buf_end_inc] = '\0';
+			int err;
+			if((err = _rm_dir(path_buf, path_buf_end + path_buf_end_inc))){
+				closedir(srcdir);
+				return err;
+			}
+
+			path_buf[path_buf_end + path_buf_end_inc] = '\0';
+			rmdir(path_buf);
+		} else if(S_ISREG(st.st_mode) || S_ISLNK(st.st_mode)){
+			size_t path_buf_end_inc = strlen(dent->d_name);
+			memcpy(path_buf + path_buf_end, dent->d_name, path_buf_end_inc);
+			path_buf[path_buf_end + path_buf_end_inc] = '\0';
+			unlink(path_buf);
+		}
+	}
+	closedir(srcdir);
+
+	rmdir(path);
 	return 0;
 }

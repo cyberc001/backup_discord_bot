@@ -14,5 +14,9 @@ void get_all_channel_messages(struct discord* client, u64snowflake channel_id, v
 
 // recursive mkdir. Does not return an error if a directory already exists.
 int make_dir(const char* path, mode_t mode); 
+// recursively delete all files in the directory and the directory itself
+#define ERROR_CANNOT_OPEN_DIR		-1
+#define ERROR_CANNOT_STAT_FILE		-2
+int rm_dir(const char* path);
 
 #endif
