@@ -1,7 +1,38 @@
 #include "utils.h"
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <errno.h>
+
+void discord_interaction_respond(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
+{
+	va_list fargs;
+	va_start(fargs, format);
+	char msg[2048];
+	vsnprintf(msg, sizeof(msg), format, fargs);
+	va_end(fargs);
+
+	struct discord_interaction_response params = {
+		.type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
+		.data = &(struct discord_interaction_callback_data){
+			.content = msg
+		}
+	};
+	discord_create_interaction_response(client, interaction->id, interaction->token, &params, NULL);
+}
+void discord_interaction_response_edit(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
+{
+	va_list fargs;
+	va_start(fargs, format);
+	char msg[2048];
+	vsnprintf(msg, sizeof(msg), format, fargs);
+	va_end(fargs);
+
+	struct discord_edit_original_interaction_response params = {
+		.content = msg
+	};
+	discord_edit_original_interaction_response(client, interaction->application_id, interaction->token, &params, NULL);
+}
 
 struct discord_guild get_guild_by_id(struct discord* client, u64snowflake id)
 {

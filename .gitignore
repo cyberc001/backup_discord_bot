@@ -1,6 +1,7 @@
 # executable
 backup_discord_bot
 backup/**
+*.swp
 
 # Prerequisites
 *.d

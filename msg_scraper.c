@@ -1,6 +1,7 @@
 #include "msg_scraper.h"
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include "utils.h"
 
 void msg_scraper_on_ready(struct discord *client, const struct discord_ready *e)
@@ -18,6 +19,9 @@ struct backup_got_messages_data
 	char* guild_name;
 	char* channel_name;
 	FILE* msg_log;
+
+	struct discord* client;
+	struct discord_interaction interaction;
 };
 void _backup_got_messages(const struct discord_messages* msgs, void* _data)
 {
@@ -37,11 +41,12 @@ void _backup_got_messages(const struct discord_messages* msgs, void* _data)
 void msg_scraper_on_interaction(struct discord *client, const struct discord_interaction *e)
 {
 	if(!strcmp(e->data->name, "backup")){
+		discord_interaction_respond(client, e, "Starting backup...");
 		struct discord_guild guild = get_guild_by_id(client, e->guild_id);
 		struct discord_channels channels = get_guild_channels(client, e->guild_id);
 		for(int i = 0; i < channels.size; ++i){
 			struct discord_channel* chan = channels.array + i;
-			if(chan->type == DISCORD_CHANNEL_GUILD_TEXT && chan->id == 1396667972038430762){
+			if(chan->type == DISCORD_CHANNEL_GUILD_TEXT){
 				struct backup_got_messages_data* data = malloc(sizeof(struct backup_got_messages_data));
 				data->guild_name = strdup(guild.name);
 				data->channel_name = strdup(chan->name);
@@ -53,12 +58,16 @@ void msg_scraper_on_interaction(struct discord *client, const struct discord_int
 				make_dir(msg_log_path, 0755);
 				strcat(msg_log_path, chan->name);
 				strcat(msg_log_path, ".md");
+
 				data->msg_log = fopen(msg_log_path, "w");
 				if(!data->msg_log){
-					fprintf(stderr, "Cannot open \"%s\" for writing\n", msg_log_path);
+					discord_interaction_response_edit(client, e, "Cannot open \"%s\" for writing", msg_log_path);
+					sleep(1); // I could have made it wait for a callback, but thats complicated for a rare error message
 					exit(1);
 				}
 
+				data->client = client;
+				data->interaction = *e; // interaction is going to be freed - save id and token
 				get_all_channel_messages(client, chan->id, _backup_got_messages, data);
 			}
 		}
