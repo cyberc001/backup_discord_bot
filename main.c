@@ -4,7 +4,7 @@
 
 #include "discord.h"
 
-#include "utils.h"
+#include "master_record.h"
 #include "msg_scraper.h"
 
 void on_ready(struct discord* client, const struct discord_ready* e)
@@ -20,6 +20,16 @@ void on_interaction(struct discord* client, const struct discord_interaction* e)
 
 int main(int argc, const char** argv)
 {
+	int err = init_master_record("master_record.bin");
+	switch(err){
+		case ERROR_CANNOT_READ_MASTER_RECORD:
+			fprintf(stderr, "Invalid master record; cannot read\n");
+			return 1;
+		case ERROR_CANNOT_WRITE_MASTER_RECORD:
+			fprintf(stderr, "Cannot open \"master_record.bin\" for writing\n");
+			return 1;
+	}
+
 	ccord_global_init();
 	struct discord* client = discord_config_init("config.json");
 	assert(client && "Couldn't initialize client");

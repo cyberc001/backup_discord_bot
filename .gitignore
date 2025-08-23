@@ -2,6 +2,7 @@
 backup_discord_bot
 backup/**
 *.swp
+*.bin
 
 # Prerequisites
 *.d

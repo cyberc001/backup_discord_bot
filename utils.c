@@ -8,6 +8,18 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+void discord_send_message(struct discord* client, u64snowflake channel_id, const char* format, ...)
+{
+	va_list fargs;
+	va_start(fargs, format);
+	char msg[2048];
+	vsnprintf(msg, sizeof(msg), format, fargs);
+	va_end(fargs);
+
+	struct discord_create_message params = {.content = msg};
+	discord_create_message(client, channel_id, &params, NULL);
+}
+
 void discord_interaction_respond(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
 {
 	va_list fargs;

@@ -4,6 +4,8 @@
 #include <sys/stat.h>
 #include "discord.h"
 
+void discord_send_message(struct discord* client, u64snowflake channel_id, const char* format, ...);
+
 void discord_interaction_respond(struct discord* client, const struct discord_interaction* interaction, const char* format, ...);
 void discord_interaction_response_edit(struct discord* client, const struct discord_interaction* interaction, const char* format, ...);
 
