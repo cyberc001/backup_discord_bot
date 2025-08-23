@@ -4,5 +4,8 @@
 	},
 	"discord": {
 		"token": ""
-	}
+	},
+
+	"max_backups": 3,
+	"backup_interval": 10
 }

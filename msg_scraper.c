@@ -10,6 +10,7 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
+#include "master_config.h"
 #include "master_record.h"
 #include "utils.h"
 
@@ -42,13 +43,12 @@ void msg_scraper_on_ready(struct discord* client, const struct discord_ready *e)
 		backup_guilds.ids[i] = e->guilds->array[i].id;
 	}
 
-	const time_t backup_interval = 10;
 	time_t now = time(NULL);
 	discord_timer_interval(client, backup_timer, backup_timer, NULL,
-					(now > master_record.last_backup_time + backup_interval ? 0 :
-					now > master_record.last_backup_time ? backup_interval - (now - master_record.last_backup_time) :
-					backup_interval) * 1000,
-					backup_interval * 1000, -1);
+					(now > master_record.last_backup_time + master_config.backup_interval ? 0 :
+					now > master_record.last_backup_time ? master_config.backup_interval - (now - master_record.last_backup_time) :
+					master_config.backup_interval) * 1000,
+					master_config.backup_interval * 1000, -1);
 }
 
 struct backup_got_messages_data
@@ -128,9 +128,8 @@ static int backup(struct discord* client, u64snowflake guild_id)
 	char dirname_buf[4096];
 	strcpy(dirname_buf, guild_backup_path);
 	size_t dirname_buf_end = strlen(dirname_buf);
-	const size_t MAX_BACKUPS = 3;
-	if(backups_i >= MAX_BACKUPS){
-		for(size_t i = 0; i < backups_i - MAX_BACKUPS + 1; ++i){
+	if(backups_i >= master_config.max_backups){
+		for(size_t i = 0; i < backups_i - master_config.max_backups + 1; ++i){
 			strcpy(dirname_buf + dirname_buf_end, backups[i].dent->d_name);
 			rm_dir(dirname_buf);
 		}

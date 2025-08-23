@@ -4,6 +4,7 @@
 
 #include "discord.h"
 
+#include "master_config.h"
 #include "master_record.h"
 #include "msg_scraper.h"
 
@@ -27,6 +28,15 @@ int main(int argc, const char** argv)
 			return 1;
 		case ERROR_CANNOT_WRITE_MASTER_RECORD:
 			fprintf(stderr, "Cannot open \"master_record.bin\" for writing\n");
+			return 1;
+	}
+	err = init_master_config("config.json");
+	switch(err){
+		case ERROR_CANNOT_READ_MASTER_CONFIG:
+			fprintf(stderr, "Cannot open master config for reading\n");
+			return 1;
+		case ERROR_CANNOT_PARSE_MASTER_CONFIG:
+			fprintf(stderr, "Cannot parse master config\n");
 			return 1;
 	}
 
