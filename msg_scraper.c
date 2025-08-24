@@ -55,27 +55,54 @@ void msg_scraper_on_ready(struct discord* client, const struct discord_ready *e)
 struct backup_got_messages_data
 {
 	u64snowflake guild_id;
+	char files_path_buffer[4096];
+	size_t files_path_end; // where the path ends; pre-calculated before getting messages
+
+	// resources per channel that should be freed
 	char* guild_name;
 	char* channel_name;
 	FILE* msg_log;
 
+	// shared resources that should be freed when last channel finishes
 	atomic_int* channels_left;
+	CURL* curl;
 
 	struct discord* client;
 };
-void _backup_got_messages(const struct discord_messages* msgs, void* _data)
+static void _backup_got_messages(const struct discord_messages* msgs, void* _data)
 {
 	struct backup_got_messages_data* data = _data;
 
 	if(msgs->size){
-		for(int i = 0; i < msgs->size; ++i)
+		for(int i = 0; i < msgs->size; ++i){
 			fprintf(data->msg_log, "\\[%s\\]: %s\n\n", msgs->array[i].author->username, msgs->array[i].content);
+
+			struct discord_attachments* attachments = msgs->array[i].attachments;
+			for(int j = 0; j < attachments->size; ++j){
+				struct discord_attachment* att = attachments->array + j;
+				fprintf(stderr, "attachment %s %d %s\n", att->filename, att->height, att->content_type);
+
+				snprintf(data->files_path_buffer + data->files_path_end, sizeof(data->files_path_buffer) - data->files_path_end,
+						"%lu_", msgs->array[i].id);
+				strcat(data->files_path_buffer + data->files_path_end, att->filename); // +end just speeds up iterating a bit
+				FILE* fd = fopen(data->files_path_buffer, "wb");
+				curl_easy_setopt(data->curl, CURLOPT_WRITEDATA, fd);
+				curl_easy_setopt(data->curl, CURLOPT_URL, att->url);
+				curl_easy_perform(data->curl);
+				fclose(fd);
+
+				if(strlen(att->content_type) >= strlen("image") && !memcmp(att->content_type, "image", strlen("image")))
+					fprintf(data->msg_log, "!");
+				fprintf(data->msg_log, "[%s](%s)\n", att->filename, data->files_path_buffer + data->files_path_end - strlen("files/"));
+			}
+		}
 	} else {
 		// Send message about backup succeding
 		if(!--(*data->channels_left) && has_master_record_guild(data->guild_id)){
 			free(data->channels_left);
 			struct _guild_record gr = get_master_record_guild(data->guild_id);
 			discord_send_message(data->client, gr.log_channel_id, "Successfuly backed up server messages.");
+			curl_easy_cleanup(data->curl);
 		}
 
 		fclose(data->msg_log);
@@ -83,6 +110,10 @@ void _backup_got_messages(const struct discord_messages* msgs, void* _data)
 		free(data->channel_name);
 		free(data);
 	}
+}
+static size_t _curl_write_data(void* ptr, size_t size, size_t nmemb, void* stream)
+{
+	return fwrite(ptr, size, nmemb, (FILE*)stream);
 }
 
 struct backup_dirent
@@ -151,8 +182,14 @@ static int backup(struct discord* client, u64snowflake guild_id)
 	free(backups);
 
 	strcat(guild_backup_path, backup_id_str);
-	strcat(guild_backup_path, "/");
 	make_dir(guild_backup_path, 0755);
+	strcat(guild_backup_path, "/");
+
+	char* files_path = malloc(strlen(guild_backup_path) + strlen("files") + 2);
+	strcpy(files_path, guild_backup_path);
+	strcat(files_path, "files/");
+	make_dir(files_path, 0755);
+	size_t files_path_ln = strlen(files_path);
 
 	struct discord_channels channels = get_guild_channels(client, guild_id);
 	atomic_int* channels_left = malloc(sizeof(atomic_int));
@@ -160,8 +197,14 @@ static int backup(struct discord* client, u64snowflake guild_id)
 	for(int i = 0; i < channels.size; ++i)
 		*channels_left += (channels.array[i].type == DISCORD_CHANNEL_GUILD_TEXT);
 
+	CURL* curl;
 	if(!*channels_left)
 		free(channels_left); // no messages will be fetched, so avoid a memory leak
+	else{
+		curl = curl_easy_init();
+		curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
+		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, _curl_write_data);
+	}
 
 	for(int i = 0; i < channels.size; ++i){
 		struct discord_channel* chan = channels.array + i;
@@ -177,6 +220,8 @@ static int backup(struct discord* client, u64snowflake guild_id)
 			strcat(msg_log_path, chan->name);
 			strcat(msg_log_path, ".md");
 
+			strcpy(data->files_path_buffer, files_path);
+			data->files_path_end = files_path_ln;
 			data->msg_log = fopen(msg_log_path, "w");
 			if(!data->msg_log){
 				fprintf(stderr, "Cannot open \"%s\" for writing\n", msg_log_path);
@@ -185,11 +230,13 @@ static int backup(struct discord* client, u64snowflake guild_id)
 			free(msg_log_path);
 
 			data->client = client;
+			data->curl = curl;
 			get_all_channel_messages(client, chan->id, _backup_got_messages, data);
 		}
 	}
 
 	free(guild_backup_path);
+	free(files_path);
 	discord_channels_cleanup(&channels);
 	discord_guild_cleanup(&guild);
 	return 0;
