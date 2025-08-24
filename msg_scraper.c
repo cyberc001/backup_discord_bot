@@ -5,6 +5,7 @@
 #include <limits.h>
 
 #include <pthread.h>
+#include <stdatomic.h>
 
 #include <unistd.h>
 #include <dirent.h>
@@ -53,9 +54,12 @@ void msg_scraper_on_ready(struct discord* client, const struct discord_ready *e)
 
 struct backup_got_messages_data
 {
+	u64snowflake guild_id;
 	char* guild_name;
 	char* channel_name;
 	FILE* msg_log;
+
+	atomic_int* channels_left;
 
 	struct discord* client;
 };
@@ -65,8 +69,15 @@ void _backup_got_messages(const struct discord_messages* msgs, void* _data)
 
 	if(msgs->size){
 		for(int i = 0; i < msgs->size; ++i)
-			fprintf(data->msg_log, "[%s]: %s\n", msgs->array[i].author->username, msgs->array[i].content);
+			fprintf(data->msg_log, "\\[%s\\]: %s\n\n", msgs->array[i].author->username, msgs->array[i].content);
 	} else {
+		// Send message about backup succeding
+		if(!--(*data->channels_left) && has_master_record_guild(data->guild_id)){
+			free(data->channels_left);
+			struct _guild_record gr = get_master_record_guild(data->guild_id);
+			discord_send_message(data->client, gr.log_channel_id, "Successfuly backed up server messages.");
+		}
+
 		fclose(data->msg_log);
 		free(data->guild_name);
 		free(data->channel_name);
@@ -144,12 +155,22 @@ static int backup(struct discord* client, u64snowflake guild_id)
 	make_dir(guild_backup_path, 0755);
 
 	struct discord_channels channels = get_guild_channels(client, guild_id);
+	atomic_int* channels_left = malloc(sizeof(atomic_int));
+	*channels_left = 0;
+	for(int i = 0; i < channels.size; ++i)
+		*channels_left += (channels.array[i].type == DISCORD_CHANNEL_GUILD_TEXT);
+
+	if(!*channels_left)
+		free(channels_left); // no messages will be fetched, so avoid a memory leak
+
 	for(int i = 0; i < channels.size; ++i){
 		struct discord_channel* chan = channels.array + i;
 		if(chan->type == DISCORD_CHANNEL_GUILD_TEXT){
 			struct backup_got_messages_data* data = malloc(sizeof(struct backup_got_messages_data));
+			data->guild_id = guild.id;
 			data->guild_name = strdup(guild.name);
 			data->channel_name = strdup(chan->name);
+			data->channels_left = channels_left;
 
 			char* msg_log_path = malloc(strlen(guild_backup_path) + strlen(chan->name) + strlen(".md") + 2);
 			strcpy(msg_log_path, guild_backup_path);
@@ -167,13 +188,6 @@ static int backup(struct discord* client, u64snowflake guild_id)
 			get_all_channel_messages(client, chan->id, _backup_got_messages, data);
 		}
 	}
-
-	// Send message about backup succeding
-	if(has_master_record_guild(guild_id)){
-		struct _guild_record gr = get_master_record_guild(guild_id);
-		discord_send_message(client, gr.log_channel_id, "Successfuly backed up server messages.");
-	}
-
 
 	free(guild_backup_path);
 	discord_channels_cleanup(&channels);
