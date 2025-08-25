@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <limits.h>
+#include <errno.h>
 
 #include <pthread.h>
 #include <stdatomic.h>
@@ -23,8 +24,6 @@ static int backup(struct discord* client, u64snowflake guild_id);
 static void backup_timer(struct discord* client, struct discord_timer* timer)
 {
 	if(timer->flags & DISCORD_TIMER_TICK){
-		fprintf(stderr, "Should backup delay %ld interval %ld\n", timer->delay, timer->interval);
-		
 		for(size_t i = 0; i < backup_guilds.size; ++i)
 			backup(client, backup_guilds.ids[i]);
 		
@@ -80,7 +79,6 @@ static void _backup_got_messages(const struct discord_messages* msgs, void* _dat
 			struct discord_attachments* attachments = msgs->array[i].attachments;
 			for(int j = 0; j < attachments->size; ++j){
 				struct discord_attachment* att = attachments->array + j;
-				fprintf(stderr, "attachment %s %d %s\n", att->filename, att->height, att->content_type);
 
 				snprintf(data->files_path_buffer + data->files_path_end, sizeof(data->files_path_buffer) - data->files_path_end,
 						"%lu_", msgs->array[i].id);
@@ -180,6 +178,14 @@ static int backup(struct discord* client, u64snowflake guild_id)
 
 	snprintf(backup_id_str, sizeof(backup_id_str), "%lu", backups_i ? backups[backups_i - 1].id + 1 : 1);
 	free(backups);
+
+	// create a symbolic link to this backup as latest
+	char* guild_backup_path_latest = malloc(strlen(guild_backup_path) + strlen("latest") + 1);
+	strcpy(guild_backup_path_latest, guild_backup_path);
+	strcat(guild_backup_path_latest, "latest");
+	if(symlink(backup_id_str, guild_backup_path_latest) < 0)
+		fprintf(stderr, "Could not create latest symlink: %d\n", errno);
+	free(guild_backup_path_latest);
 
 	strcat(guild_backup_path, backup_id_str);
 	make_dir(guild_backup_path, 0755);
