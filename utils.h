@@ -2,7 +2,14 @@
 #define UTILS_H
 
 #include <sys/stat.h>
-#include "discord.h"
+#include <discord.h>
+#include <discord-internal.h>
+
+#define dlog_trace(client, msg, ...) logconf_trace(&(client)->conf, msg, ##__VA_ARGS__)
+#define dlog_info(client, msg, ...) logconf_info(&(client)->conf, msg, ##__VA_ARGS__)
+#define dlog_warn(client, msg, ...) logconf_warn(&(client)->conf, msg, ##__VA_ARGS__)
+#define dlog_error(client, msg, ...) logconf_error(&(client)->conf, msg, ##__VA_ARGS__)
+#define dlog_fatal(client, msg, ...) logconf_fatal(&(client)->conf, msg, ##__VA_ARGS__)
 
 void discord_send_message(struct discord* client, u64snowflake channel_id, const char* format, ...);
 

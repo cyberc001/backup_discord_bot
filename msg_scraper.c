@@ -16,8 +16,6 @@
 #include "master_record.h"
 #include "utils.h"
 
-#include "log.h"
-
 struct {
 	u64snowflake* ids;
 	size_t size;
@@ -104,7 +102,7 @@ static void _backup_got_messages(const struct discord_messages* msgs, void* _dat
 			discord_send_message(data->client, gr.log_channel_id, "Successfuly backed up guild messages.");
 			curl_easy_cleanup(data->curl);
 
-			log_info("Successfuly backed up guild \"%s\"", data->guild_name);
+			dlog_info(data->client, "Successfuly backed up guild \"%s\"", data->guild_name);
 			free(data->guild_name);
 		}
 
@@ -133,7 +131,7 @@ static int backup_dirent_cmp(const void* _d1, const void* _d2)
 static int backup(struct discord* client, u64snowflake guild_id)
 {
 	struct discord_guild guild = get_guild_by_id(client, guild_id);
-	log_info("Starting to back up guild \"%s\"", guild.name);
+	dlog_info(client, "Starting to back up guild \"%s\"", guild.name);
 
 	char backup_id_str[10];
 	char* guild_backup_path = malloc(strlen("backup") + strlen(guild.name) + sizeof(backup_id_str) + 4);
@@ -191,7 +189,7 @@ static int backup(struct discord* client, u64snowflake guild_id)
 	strcat(guild_backup_path_latest, "latest");
 	unlink(guild_backup_path_latest);
 	if(symlink(backup_id_str, guild_backup_path_latest) < 0)
-		log_warn("Could not create latest symlink: %s", strerror(errno));
+		dlog_warn(client, "Could not create latest symlink: %s", strerror(errno));
 	free(guild_backup_path_latest);
 
 	strcat(guild_backup_path, backup_id_str);
@@ -238,7 +236,7 @@ static int backup(struct discord* client, u64snowflake guild_id)
 			data->files_path_end = files_path_ln;
 			data->msg_log = fopen(msg_log_path, "w");
 			if(!data->msg_log){
-				log_fatal("Cannot open \"%s\" for writing", msg_log_path);
+				dlog_fatal(client, "Cannot open \"%s\" for writing", msg_log_path);
 				return -1;
 			}
 			free(msg_log_path);

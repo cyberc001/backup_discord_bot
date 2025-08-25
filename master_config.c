@@ -1,6 +1,7 @@
 #include "master_config.h"
 
-#include "log.h"
+#include "utils.h"
+#include <string.h>
 #include <jsmn.h>
 #include <jsmn-find.h>
 
@@ -16,7 +17,7 @@ struct _master_config master_config;
 		(var) = strtoul(str, &endptr, 10);\
 		if(*endptr){\
 			free(tokens); free(pairs); free(json);\
-			log_error("Error: expected unsigned number, got %s", str);\
+			dlog_error(client, "Error: expected unsigned number, got %s", str);\
 			free(str);\
 			return ERROR_CANNOT_PARSE_MASTER_CONFIG;\
 		}\
@@ -24,7 +25,7 @@ struct _master_config master_config;
 	}\
 }
 
-int init_master_config(const char* fname)
+int init_master_config(struct discord* client, const char* fname)
 {
 	FILE* fd = fopen(fname, "r");
 	if(!fd)
