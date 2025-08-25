@@ -16,6 +16,8 @@
 #include "master_record.h"
 #include "utils.h"
 
+#include "log.h"
+
 struct {
 	u64snowflake* ids;
 	size_t size;
@@ -58,11 +60,11 @@ struct backup_got_messages_data
 	size_t files_path_end; // where the path ends; pre-calculated before getting messages
 
 	// resources per channel that should be freed
-	char* guild_name;
 	char* channel_name;
 	FILE* msg_log;
 
 	// shared resources that should be freed when last channel finishes
+	char* guild_name;
 	atomic_int* channels_left;
 	CURL* curl;
 
@@ -99,12 +101,14 @@ static void _backup_got_messages(const struct discord_messages* msgs, void* _dat
 		if(!--(*data->channels_left) && has_master_record_guild(data->guild_id)){
 			free(data->channels_left);
 			struct _guild_record gr = get_master_record_guild(data->guild_id);
-			discord_send_message(data->client, gr.log_channel_id, "Successfuly backed up server messages.");
+			discord_send_message(data->client, gr.log_channel_id, "Successfuly backed up guild messages.");
 			curl_easy_cleanup(data->curl);
+
+			log_info("Successfuly backed up guild \"%s\"", data->guild_name);
+			free(data->guild_name);
 		}
 
 		fclose(data->msg_log);
-		free(data->guild_name);
 		free(data->channel_name);
 		free(data);
 	}
@@ -129,6 +133,8 @@ static int backup_dirent_cmp(const void* _d1, const void* _d2)
 static int backup(struct discord* client, u64snowflake guild_id)
 {
 	struct discord_guild guild = get_guild_by_id(client, guild_id);
+	log_info("Starting to back up guild \"%s\"", guild.name);
+
 	char backup_id_str[10];
 	char* guild_backup_path = malloc(strlen("backup") + strlen(guild.name) + sizeof(backup_id_str) + 4);
 	strcpy(guild_backup_path, "backup/");
@@ -183,8 +189,9 @@ static int backup(struct discord* client, u64snowflake guild_id)
 	char* guild_backup_path_latest = malloc(strlen(guild_backup_path) + strlen("latest") + 1);
 	strcpy(guild_backup_path_latest, guild_backup_path);
 	strcat(guild_backup_path_latest, "latest");
+	unlink(guild_backup_path_latest);
 	if(symlink(backup_id_str, guild_backup_path_latest) < 0)
-		fprintf(stderr, "Could not create latest symlink: %d\n", errno);
+		log_warn("Could not create latest symlink: %s", strerror(errno));
 	free(guild_backup_path_latest);
 
 	strcat(guild_backup_path, backup_id_str);
@@ -212,12 +219,13 @@ static int backup(struct discord* client, u64snowflake guild_id)
 		curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, _curl_write_data);
 	}
 
+	char* guild_name = strdup(guild.name);
 	for(int i = 0; i < channels.size; ++i){
 		struct discord_channel* chan = channels.array + i;
 		if(chan->type == DISCORD_CHANNEL_GUILD_TEXT){
 			struct backup_got_messages_data* data = malloc(sizeof(struct backup_got_messages_data));
 			data->guild_id = guild.id;
-			data->guild_name = strdup(guild.name);
+			data->guild_name = guild_name;
 			data->channel_name = strdup(chan->name);
 			data->channels_left = channels_left;
 
@@ -230,7 +238,7 @@ static int backup(struct discord* client, u64snowflake guild_id)
 			data->files_path_end = files_path_ln;
 			data->msg_log = fopen(msg_log_path, "w");
 			if(!data->msg_log){
-				fprintf(stderr, "Cannot open \"%s\" for writing\n", msg_log_path);
+				log_fatal("Cannot open \"%s\" for writing", msg_log_path);
 				return -1;
 			}
 			free(msg_log_path);

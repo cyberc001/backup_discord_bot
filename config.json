@@ -1,11 +1,14 @@
 {
 	"logging": {
-		"level": "trace"
+		"level": "info",
+		"filename": "log.txt",
+		"overwrite": true,
+		"disable_modules": ["WEBSOCKETS", "USER_AGENT", "DISCORD_REFCOUNT"]
 	},
 	"discord": {
 		"token": ""
 	},
 
 	"max_backups": 3,
-	"backup_interval": 10
+	"backup_interval": 120
 }

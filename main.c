@@ -3,6 +3,7 @@
 #include <assert.h>
 
 #include "discord.h"
+#include "log.h"
 
 #include "master_config.h"
 #include "master_record.h"
@@ -21,22 +22,25 @@ void on_interaction(struct discord* client, const struct discord_interaction* e)
 
 int main(int argc, const char** argv)
 {
-	int err = init_master_record("master_record.bin");
+	const char* master_record_fname = "master_record.bin";
+	int err = init_master_record(master_record_fname);
 	switch(err){
 		case ERROR_CANNOT_READ_MASTER_RECORD:
-			fprintf(stderr, "Invalid master record; cannot read\n");
+			log_fatal("Invalid master record; cannot read \"%s\"", master_record_fname);
 			return 1;
 		case ERROR_CANNOT_WRITE_MASTER_RECORD:
-			fprintf(stderr, "Cannot open \"master_record.bin\" for writing\n");
+			log_fatal("Cannot open \"%s\" for writing", master_record_fname);
 			return 1;
 	}
-	err = init_master_config("config.json");
+
+	const char* master_config_fname = "config.json";
+	err = init_master_config(master_config_fname);
 	switch(err){
 		case ERROR_CANNOT_READ_MASTER_CONFIG:
-			fprintf(stderr, "Cannot open master config for reading\n");
+			log_fatal("Cannot open master config \"%s\" for reading", master_config_fname);
 			return 1;
 		case ERROR_CANNOT_PARSE_MASTER_CONFIG:
-			fprintf(stderr, "Cannot parse master config\n");
+			log_fatal("Cannot parse master config \"%s\"", master_config_fname);
 			return 1;
 	}
 

@@ -1,5 +1,6 @@
 #include "master_config.h"
 
+#include "log.h"
 #include <jsmn.h>
 #include <jsmn-find.h>
 
@@ -15,7 +16,7 @@ struct _master_config master_config;
 		(var) = strtoul(str, &endptr, 10);\
 		if(*endptr){\
 			free(tokens); free(pairs); free(json);\
-			fprintf(stderr, "Error: expected unsigned number, got %s\n", str);\
+			log_error("Error: expected unsigned number, got %s", str);\
 			free(str);\
 			return ERROR_CANNOT_PARSE_MASTER_CONFIG;\
 		}\
