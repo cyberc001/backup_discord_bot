@@ -31,24 +31,27 @@ static void backup_timer(struct discord* client, struct discord_timer* timer)
 		write_master_record();
 	}
 }
-void msg_scraper_on_ready(struct discord* client, const struct discord_ready *e)
+void msg_scraper_on_ready(struct discord* client, const struct discord_ready *e, int repeat)
 {
 	struct discord_create_guild_application_command params = {
 		.name = "backup",
 		.description = "Initiate backup manually"
 	};
-	backup_guilds.size = e->guilds->size; backup_guilds.ids = malloc(e->guilds->size * sizeof(u64snowflake));
-	for(int i = 0; i < e->guilds->size; ++i){
-		discord_create_guild_application_command(client, e->application->id, e->guilds->array[i].id, &params, NULL);
-		backup_guilds.ids[i] = e->guilds->array[i].id;
-	}
 
-	time_t now = time(NULL);
-	discord_timer_interval(client, backup_timer, backup_timer, NULL,
-					(now > master_record.last_backup_time + master_config.backup_interval ? 0 :
-					now > master_record.last_backup_time ? master_config.backup_interval - (now - master_record.last_backup_time) :
-					master_config.backup_interval) * 1000,
-					master_config.backup_interval * 1000, -1);
+	if(!repeat){
+		backup_guilds.size = e->guilds->size; backup_guilds.ids = malloc(e->guilds->size * sizeof(u64snowflake));
+		for(int i = 0; i < e->guilds->size; ++i){
+			discord_create_guild_application_command(client, e->application->id, e->guilds->array[i].id, &params, NULL);
+			backup_guilds.ids[i] = e->guilds->array[i].id;
+		}
+
+		time_t now = time(NULL);
+		discord_timer_interval(client, backup_timer, backup_timer, NULL,
+						(now > master_record.last_backup_time + master_config.backup_interval ? 0 :
+						now > master_record.last_backup_time ? master_config.backup_interval - (now - master_record.last_backup_time) :
+						master_config.backup_interval) * 1000,
+						master_config.backup_interval * 1000, -1);
+	}
 }
 
 struct backup_got_messages_data

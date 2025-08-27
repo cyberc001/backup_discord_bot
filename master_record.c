@@ -34,12 +34,6 @@ static FILE* master_fd;
 }
 
 
-void exit_handler(int signal)
-{
-	fclose(master_fd);
-	exit(0);
-}
-
 void write_master_record()
 {
 	rewind(master_fd);
@@ -72,15 +66,13 @@ int init_master_record(const char* fname)
 
 		fclose(fd);
 	}
-	master_fd = fopen(fname, "wb+");
+	master_fd = fopen(fname, "ab");
 	if(!master_fd)
 		return ERROR_CANNOT_WRITE_MASTER_RECORD;
 	if(!fd)
 		write_master_record();
 
-	signal(SIGINT, exit_handler);
-	//signal(SIGSEGV, exit_handler);
-        return 0;
+	return 0;
 }
 
 void set_master_record_guild(u64snowflake key, struct _guild_record value)
