@@ -47,6 +47,7 @@ void write_master_record()
 		MR_WRITE(master_record.guild_records->buckets[i].key);
 		MR_WRITE(master_record.guild_records->buckets[i].value);
 	}
+	fflush(master_fd);
 }
 
 int init_master_record(const char* fname)
@@ -66,11 +67,10 @@ int init_master_record(const char* fname)
 
 		fclose(fd);
 	}
-	master_fd = fopen(fname, "ab");
+	master_fd = fopen(fname, "wb");
 	if(!master_fd)
 		return ERROR_CANNOT_WRITE_MASTER_RECORD;
-	if(!fd)
-		write_master_record();
+	write_master_record();
 
 	return 0;
 }

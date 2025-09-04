@@ -24,6 +24,14 @@ struct _master_config master_config;
 		free(str);\
 	}\
 }
+#define READ_STR(var, root, key, def_val){\
+	jsmnf_pair* f = jsmnf_find((root), json, (key), strlen(key));\
+	if(!f)\
+		(var) = (def_val);\
+	else {\
+		(var) = malloc(f->v.len + 1); memcpy((var), json + f->v.pos, f->v.len + 1); (var)[f->v.len] = '\0';\
+	}\
+}
 
 int init_master_config(struct discord* client, const char* fname)
 {
@@ -59,6 +67,7 @@ int init_master_config(struct discord* client, const char* fname)
 	}
 	READ_UNSIGNED(master_config.max_backups, pairs, "max_backups", 3);
 	READ_UNSIGNED(master_config.backup_interval, pairs, "backup_interval", 10);
+	READ_STR(master_config.owm_appid, pairs, "owm_appid", "");
 	
 	free(tokens);
 	free(pairs);

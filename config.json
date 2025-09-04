@@ -9,6 +9,8 @@
 		"token": ""
 	},
 
-	"max_backups": 3,
-	"backup_interval": 120
+	"max_backups": 5,
+	"backup_interval": 42300,
+
+	"owm_appid": ""
 }

@@ -7,6 +7,8 @@
 extern struct _master_config {
 	size_t max_backups;		// per server
 	time_t backup_interval;
+
+	char* owm_appid; // openweathermap token
 } master_config;
 
 #define ERROR_CANNOT_READ_MASTER_CONFIG		-1

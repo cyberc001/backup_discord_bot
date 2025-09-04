@@ -7,13 +7,16 @@
 
 #include "master_config.h"
 #include "master_record.h"
+
 #include "msg_scraper.h"
+#include "weather_scraper.h"
 
 static int client_init = 0;
 
 void on_ready(struct discord* client, const struct discord_ready* e)
 {
 	msg_scraper_on_ready(client, e, client_init);
+	weather_scraper_on_ready(client, e, client_init);
 
 	client_init = 1;
 }
@@ -22,6 +25,7 @@ void on_interaction(struct discord* client, const struct discord_interaction* e)
 	if(e->type != DISCORD_INTERACTION_APPLICATION_COMMAND)
 		return;
 	msg_scraper_on_interaction(client, e);
+	weather_scraper_on_interaction(client, e);
 }
 
 int main(int argc, const char** argv)
