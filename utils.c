@@ -8,25 +8,26 @@
 #include <dirent.h>
 #include <sys/stat.h>
 
-void discord_send_message(struct discord* client, u64snowflake channel_id, const char* format, ...)
+static void _discord_send_message(struct discord* client, u64snowflake channel_id, const char* format, va_list args)
 {
-	va_list fargs;
-	va_start(fargs, format);
 	char msg[2048];
-	vsnprintf(msg, sizeof(msg), format, fargs);
-	va_end(fargs);
+	vsnprintf(msg, sizeof(msg), format, args);
 
 	struct discord_create_message params = {.content = msg};
 	discord_create_message(client, channel_id, &params, NULL);
 }
-
-void discord_interaction_respond(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
+void discord_send_message(struct discord* client, u64snowflake channel_id, const char* format, ...)
 {
-	va_list fargs;
-	va_start(fargs, format);
+	va_list args;
+	va_start(args, format);
+	_discord_send_message(client, channel_id, format, args);
+	va_end(args);
+}
+
+static void _discord_interaction_respond(struct discord* client, const struct discord_interaction* interaction, const char* format, va_list args)
+{
 	char msg[2048];
-	vsnprintf(msg, sizeof(msg), format, fargs);
-	va_end(fargs);
+	vsnprintf(msg, sizeof(msg), format, args);
 
 	struct discord_interaction_response params = {
 		.type = DISCORD_INTERACTION_CHANNEL_MESSAGE_WITH_SOURCE,
@@ -36,19 +37,101 @@ void discord_interaction_respond(struct discord* client, const struct discord_in
 	};
 	discord_create_interaction_response(client, interaction->id, interaction->token, &params, NULL);
 }
-void discord_interaction_response_edit(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
+void discord_interaction_respond(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
 {
-	va_list fargs;
-	va_start(fargs, format);
+	va_list args;
+	va_start(args, format);
+	_discord_interaction_respond(client, interaction, format, args);
+	va_end(args);
+}
+
+static void _discord_interaction_response_edit(struct discord* client, const struct discord_interaction* interaction, const char* format, va_list args)
+{
 	char msg[2048];
-	vsnprintf(msg, sizeof(msg), format, fargs);
-	va_end(fargs);
+	vsnprintf(msg, sizeof(msg), format, args);
 
 	struct discord_edit_original_interaction_response params = {
 		.content = msg
 	};
 	discord_edit_original_interaction_response(client, interaction->application_id, interaction->token, &params, NULL);
 }
+void discord_interaction_response_edit(struct discord* client, const struct discord_interaction* interaction, const char* format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	_discord_interaction_response_edit(client, interaction, format, args);
+	va_end(args);
+}
+
+
+static char _inchar_buf[64];
+const char* get_inchar_append(int types)
+{
+	int selected_types[16]; int selected_types_sz = 0;
+	for(int i = 1; i < INCHAR_TYPE_ANY; i <<= 1)
+		if(types & i)
+			selected_types[selected_types_sz++] = i;
+
+	int r;
+	switch(selected_types[rand() % selected_types_sz]){
+		case INCHAR_TYPE_CHEERFUL:
+			strcpy(_inchar_buf, "нипа");
+
+			r = 1;
+			if(rand() % 4 == 0) ++r;
+			if(rand() % 4 == 0) ++r;
+			for(int i = 0; i < r; ++i)
+				strcat(_inchar_buf, "~");
+
+			r = 1;
+			if(rand() % 4 == 0) ++r;
+			if(rand() % 4 == 0) ++r;
+			for(int i = 0; i < r; ++i)
+				strcat(_inchar_buf, "☆");
+
+			r = 0;
+			if(rand() % 2 == 0) ++r;
+			if(rand() % 2 == 0) ++r;
+			if(rand() % 2 == 0) ++r;
+			for(int i = 0; i < r; ++i)
+				strcat(_inchar_buf, "!");
+
+			if(rand() % 3 == 0){
+				r = rand() % 9;
+				if(r < 4)
+					strcat(_inchar_buf, " :slight_smile:");
+				else if(r < 7)
+					strcat(_inchar_buf, " :innocent:");
+				else
+					strcat(_inchar_buf, " :grin:");
+			}
+
+			break;
+		case INCHAR_TYPE_SAD:
+			strcpy(_inchar_buf, "мип");
+
+			if(rand() % 3 == 0)
+				strcat(_inchar_buf, "...");
+			else
+				strcat(_inchar_buf, ".");
+
+			if(rand() % 3 == 0)
+				strcat(_inchar_buf, "☆");
+
+			if(rand() % 3 == 0){
+				r = rand() % 9;
+				if(r < 4)
+					strcat(_inchar_buf, " :slight_frown: ");
+				else if(r < 7)
+					strcat(_inchar_buf, " :smiling_face_with_tear: ");
+				else
+					strcat(_inchar_buf, " :sob: ");
+			}
+			break;
+	}
+	return _inchar_buf;
+}
+
 
 struct discord_guild get_guild_by_id(struct discord* client, u64snowflake id)
 {

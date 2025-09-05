@@ -30,7 +30,9 @@ void on_interaction(struct discord* client, const struct discord_interaction* e)
 
 int main(int argc, const char** argv)
 {
+	srand(time(NULL));
 	ccord_global_init();
+
 	struct discord* client = discord_config_init("config.json");
 	assert(client && "Couldn't initialize client");
 

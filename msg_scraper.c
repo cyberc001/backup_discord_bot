@@ -102,7 +102,7 @@ static void _backup_got_messages(const struct discord_messages* msgs, void* _dat
 		if(!--(*data->channels_left) && has_master_record_guild(data->guild_id)){
 			free(data->channels_left);
 			struct _guild_record gr = get_master_record_guild(data->guild_id);
-			discord_send_message(data->client, gr.log_channel_id, "Successfuly backed up guild messages.");
+			discord_send_message(data->client, gr.log_channel_id, "Сообщения сохранены, %s", get_inchar_append(INCHAR_TYPE_CHEERFUL));
 			curl_easy_cleanup(data->curl);
 
 			dlog_info(data->client, "Successfuly backed up guild \"%s\"", data->guild_name);
@@ -266,9 +266,9 @@ void msg_scraper_on_interaction(struct discord* client, const struct discord_int
 				});
 		write_master_record();
 
-		discord_interaction_respond(client, e, "Starting backup...");
+		discord_interaction_respond(client, e, "Сохраняю сообщения, %s", get_inchar_append(INCHAR_TYPE_CHEERFUL));
 		if(backup(client, e->guild_id)){
-			discord_interaction_response_edit(client, e, "Internal error, check logs");
+			discord_interaction_response_edit(client, e, "Ошибка сервера, %s\nПроверьте логи!", get_inchar_append(INCHAR_TYPE_SAD));
 			sleep(1);
 			exit(1);
 		}

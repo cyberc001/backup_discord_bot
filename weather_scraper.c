@@ -177,17 +177,37 @@ void weather_scraper_on_interaction(struct discord* client, const struct discord
 {
         if(!strcmp(e->data->name, "weather")){
 		const char* city = e->data->options->array[0].value;
+		char req_city[128];
+		size_t city_ln = strlen(city);
+		size_t i = 0, j = 0; for(; j < city_ln; ++j)
+			if(city[j] == ' '){
+				req_city[i++] = '%';
+				req_city[i++] = '2';
+				req_city[i++] = '0';
+			}
+			else
+				req_city[i++] = city[j];
+		req_city[i] = '\0';
 
 		char req[1024];
-		snprintf(req, sizeof(req), "api.openweathermap.org/data/2.5/forecast?q=%s&appid=%s", city, master_config.owm_appid);
+		snprintf(req, sizeof(req), "api.openweathermap.org/data/2.5/forecast?q=%s&appid=%s", req_city, master_config.owm_appid);
 		struct forecast forecast = get_weather(req);
 
-		fprintf(stderr, "REQUEST %s\n", req);
-
 		switch(forecast.err){
-			case FORECAST_ERROR_PARSE: discord_interaction_respond(client, e, "JSON parse error"); return;
-			case FORECAST_ERROR_CITY_NOT_FOUND: discord_interaction_respond(client, e, "City not found"); return;
+			case FORECAST_ERROR_PARSE: discord_interaction_respond(client, e, "Как это прочитать? %s", get_inchar_append(INCHAR_TYPE_SAD)); return;
+			case FORECAST_ERROR_CITY_NOT_FOUND: discord_interaction_respond(client, e, "Я не знаю такого города, %s", get_inchar_append(INCHAR_TYPE_SAD)); return;
 		}
+
+		// nipah or meep depending on smount of sunny entries
+		size_t sunny = 0;
+		for(size_t i = 0; i < forecast.ln; ++i)
+			switch(forecast.data[i].weather){
+				case CLEAR: case FEW_CLOUDS:
+					++sunny;
+					break;
+			}
+
+		int inchar_types = sunny * 2 >= forecast.ln ? INCHAR_TYPE_SAD : INCHAR_TYPE_CHEERFUL;
 
 		char msg[2001];
 		msg[0] = '\0';
@@ -195,7 +215,7 @@ void weather_scraper_on_interaction(struct discord* client, const struct discord
 
 		int prev_tm_day = -1, prev_tm_mon = -1;
 		size_t prev_tm_i = 0;
-		msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "# Погода в городе %s\n", city);
+		msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "# Погода в городе %s, %s\n", city, get_inchar_append(inchar_types));
 		for(size_t i = 0; i < forecast.ln; ++i){
 			struct tm lt; localtime_r(&forecast.data[i].ts, &lt);
 			if(lt.tm_mday != prev_tm_day || i == forecast.ln - 1){
@@ -228,8 +248,6 @@ void weather_scraper_on_interaction(struct discord* client, const struct discord
 				prev_tm_mon = lt.tm_mon;
 				prev_tm_i = i;
 			}
-
-			//fprintf(stderr, "hour %lu weather %d temp %g\n", forecast[i].ts, forecast[i].weather, forecast[i].temp);
 		}
 		discord_interaction_respond(client, e, msg);
 
