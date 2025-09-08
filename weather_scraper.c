@@ -224,7 +224,7 @@ void weather_scraper_on_interaction(struct discord* client, const struct discord
 					msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "\n## `%02d/%02d`\n ", prev_tm_day, prev_tm_mon);
 					for(size_t j = prev_tm_i; i == forecast.ln - 1 ? (j <= i) : (j < i); ++j){
 						localtime_r(&forecast.data[j].ts, &lt2);
-						msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "    `%02d:00` ", lt2.tm_hour);
+						msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "      `%02d:00` ", lt2.tm_hour);
 					}
 					strcat(msg, "\n"); ++msg_pos;
 					for(size_t j = prev_tm_i; i == forecast.ln - 1 ? (j <= i) : (j < i); ++j){
@@ -240,7 +240,7 @@ void weather_scraper_on_interaction(struct discord* client, const struct discord
 							case MIST: weather_emoji = ":fog:"; break;
 						}
 						localtime_r(&forecast.data[j].ts, &lt2);
-						msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "%s `%2.1f`", weather_emoji, forecast.data[j].temp);
+						msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "%s `%+5.1f`", weather_emoji, forecast.data[j].temp);
 					}
 				}
 
