@@ -221,7 +221,7 @@ void weather_scraper_on_interaction(struct discord* client, const struct discord
 			if(lt.tm_mday != prev_tm_day || i == forecast.ln - 1){
 				if(prev_tm_day > -1){
 					struct tm lt2; localtime_r(&forecast.data[i].ts, &lt2);
-					msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "\n## `%02d/%02d`\n ", prev_tm_day, prev_tm_mon);
+					msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "\n## `%02d/%02d`\n ", prev_tm_day, prev_tm_mon + 1);
 					for(size_t j = prev_tm_i; i == forecast.ln - 1 ? (j <= i) : (j < i); ++j){
 						localtime_r(&forecast.data[j].ts, &lt2);
 						msg_pos += snprintf(msg + msg_pos, sizeof(msg) - 1 - msg_pos, "      `%02d:00` ", lt2.tm_hour);
